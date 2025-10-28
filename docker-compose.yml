@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  # Apache Airflow - Orchestration
+  airflow-webserver:
+    image: apache/airflow:2.7.0-python3.11
+    container_name: data-platform-airflow
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://datauser:datapass123@host.docker.internal:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: d60eerFkuNDjIImZaYc81Q6DYfLad9b2Z_eVG7YozNo=
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    networks:
+      - data-platform
+    command: >
+      bash -c "airflow db init &&
+               airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com &&
+               airflow webserver"
+
+  # Grafana - Visualization
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: data-platform-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - data-platform
+
+  # Adminer - Database Management
+  adminer:
+    image: adminer:latest
+    container_name: data-platform-adminer
+    ports:
+      - "8081:8080"
+    networks:
+      - data-platform
+
+  # Jupyter - Data Analysis
+  jupyter:
+    image: jupyter/datascience-notebook:latest
+    container_name: data-platform-jupyter
+    environment:
+      JUPYTER_ENABLE_LAB: 'yes'
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./data:/home/jovyan/data
+    networks:
+      - data-platform
+    command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
+
+  # MinIO - Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: data-platform-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/minio_data
+    networks:
+      - data-platform
+    command: server /minio_data --console-address ":9001"
+
+  # Redis - Caching
+  redis:
+    image: redis:7-alpine
+    container_name: data-platform-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - data-platform
+
+  # Flask API Backend
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: data-platform-api
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: host.docker.internal
+      DB_PORT: 5432
+      DB_NAME: datawarehouse
+      DB_USER: datauser
+      DB_PASSWORD: datapass123
+      FLASK_ENV: production
+    networks:
+      - data-platform
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # React Dashboard - Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: data-platform-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+    depends_on:
+      - airflow-webserver
+      - api
+    networks:
+      - data-platform
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  grafana_data:
+  minio_data:
+  redis_data:
+
+networks:
+  data-platform:
+    driver: bridge

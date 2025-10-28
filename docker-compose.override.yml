@@ -1,0 +1,36 @@
+version: '3.8'
+
+# This file is used for local development
+# It overrides settings in docker-compose.yml
+
+services:
+  airflow-webserver:
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
+    ports:
+      - "8082:8080"
+
+  grafana:
+    environment:
+      GF_LOG_LEVEL: debug
+    ports:
+      - "3000:3000"
+
+  jupyter:
+    ports:
+      - "8888:8888"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  adminer:
+    ports:
+      - "8081:8080"
