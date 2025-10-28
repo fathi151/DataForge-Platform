@@ -1,0 +1,40 @@
+# Docker volumes
+postgres_data/
+grafana_data/
+minio_data/
+redis_data/
+
+# Airflow
+logs/
+plugins/
+*.pyc
+__pycache__/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Data files
+data/*.csv
+data/*.json
+data/*.parquet
